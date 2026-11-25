@@ -2,17 +2,28 @@
 
 [![Rust](https://img.shields.io/badge/rust-2024%20edition-orange.svg)](https://www.rust-lang.org/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Platform: Linux](https://img.shields.io/badge/platform-Linux-lightgrey.svg)](https://kernel.org)
 
-A modular, lightweight Linux system management and monitoring CLI utility built with Rust. Designed with an extensible trait-based architecture for collecting system, hardware, and process metrics directly from the Linux `/proc` virtual filesystem.
+A high-performance, modular Linux system management and metrics collection CLI utility built with Rust. Designed with an extensible trait-based architecture for inspecting system hardware, resource metrics, and running processes directly from the Linux `/proc` virtual filesystem.
+
+---
+
+## Key Highlights
+
+- **Direct `/proc` Virtual FS Parsing**: Reads directly from `/proc/cpuinfo` and `/proc/{pid}/status` with zero shell overhead and microsecond latency.
+- **Zero External Runtime Dependencies**: Compiles to a single standalone static binary. Ideal for minimal Docker images (Alpine/Distroless), embedded Linux systems, and cloud instances.
+- **Process Status Inspector**: Analyzes process status, threads count, umask, CPU affinity, and login UID for target PIDs.
+- **Extensible Collector Interface**: Standardized `Collector` trait allows seamless integration of new telemetry modules (Memory, Disk, Network).
 
 ---
 
 ## Features
 
-- **CPU Information Gathering**: Inspects and parses `/proc/cpuinfo` to extract processor count, CPU cores, cache size, vendor ID, and model name.
-- **Process Monitoring**: Inspects target processes via `/proc/{pid}` to track status, thread count, and resource allocation.
-- **Extensible Architecture**: Built around a clean `Collector` trait interface, allowing new collectors (e.g., Memory, Disk, Network) to be added effortlessly.
-- **Zero Heavy Dependencies**: Lightweight, fast startup, and native Linux integration using Rust's standard library.
+| Feature | Description | Source |
+| :--- | :--- | :--- |
+| **CPU Telemetry** | Core counts, logical processor count, vendor ID, model name, and cache size | `/proc/cpuinfo` |
+| **Process Inspector** | Target process verification, process name, threads count, umask, and CPU affinity | `/proc/{pid}/status` |
+| **Argument Dispatcher** | Custom CLI argument parser supporting boolean flags and key-value options | Native parser |
 
 ---
 
@@ -20,6 +31,7 @@ A modular, lightweight Linux system management and monitoring CLI utility built 
 
 ```
 ├── Cargo.toml
+├── Cargo.lock
 ├── LICENSE
 ├── README.md
 └── src
@@ -29,13 +41,13 @@ A modular, lightweight Linux system management and monitoring CLI utility built 
     │       └── args.rs                          # Custom argument parsing logic
     └── collectors_interface.rs                  # Module registry for metric collectors
         └── collectors_interface
-            ├── interface.rs                     # `Collector` trait definition
+            ├── interface.rs                     # `Collector` trait contract
             ├── cpu_info_utils.rs
             ├── cpu_info_utils
-            │   └── cpu_info_collector.rs        # CPU metric collector & /proc/cpuinfo parser
+            │   └── cpu_info_collector.rs        # CPU telemetry & /proc/cpuinfo parser
             ├── process_utils.rs
             └── process_utils
-                └── process_info_collector.rs    # Process monitoring collector
+                └── process_info_collector.rs    # Process inspector & /proc/{pid}/status parser
 ```
 
 ---
@@ -44,15 +56,15 @@ A modular, lightweight Linux system management and monitoring CLI utility built 
 
 ### Prerequisites
 
-- **Linux OS** (relies on the `/proc` filesystem)
-- **Rust & Cargo** (compatible with the 2024 edition):
+- **Linux OS** (relies on the Linux kernel `/proc` filesystem)
+- **Rust & Cargo** (compatible with 2024 edition):
   ```bash
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
   ```
 
-### Build
+### Build & Installation
 
-Clone the repository and build the binary:
+Clone the repository and build the release binary:
 
 ```bash
 git clone git@github.com:Ahmedfargh/one-pkg-linux-command.git
@@ -60,28 +72,31 @@ cd one-pkg-linux-command
 cargo build --release
 ```
 
-The compiled binary will be located at `target/release/commander-system-managment`.
+The optimized binary will be available at:
+```bash
+./target/release/commander-system-managment
+```
 
 ---
 
 ## Usage
 
-### 1. Collect CPU Info
-Pass the `--cpu_info` (or `cpu_info`) flag to inspect CPU details:
+### 1. Collect CPU Information
+Query CPU architecture and core details with `--cpu_info` (or `cpu_info`):
 
 ```bash
 cargo run -- --cpu_info
 ```
 
-### 2. Monitor a Process
-Pass `monitor_process=<PID>` to inspect a specific process:
+### 2. Inspect a Specific Process
+Query state, thread count, and attributes of a target process by PID:
 
 ```bash
 cargo run -- monitor_process=1
 ```
 
-### 3. Combine Arguments
-You can run multiple collectors in one execution:
+### 3. Run Multiple Collectors Simultaneously
+Combine multiple commands in a single execution:
 
 ```bash
 cargo run -- --cpu_info monitor_process=1234
@@ -89,18 +104,18 @@ cargo run -- --cpu_info monitor_process=1234
 
 ---
 
-## Architecture: Adding New Collectors
+## Extending: Adding New Collectors
 
-All collectors implement the standard `Collector` trait:
+Every metric provider implements the standard `Collector` interface:
 
 ```rust
 use crate::collectors_interface::interface::Collector;
 
-pub struct MemoryCollector;
+pub struct MemoryInfoCollector;
 
-impl Collector for MemoryCollector {
+impl Collector for MemoryInfoCollector {
     fn collect(&mut self) {
-        // Read and parse /proc/meminfo
+        // Read and parse /proc/meminfo directly
     }
 }
 ```
@@ -109,11 +124,24 @@ impl Collector for MemoryCollector {
 
 ## Roadmap
 
-- [ ] Add Memory (`/proc/meminfo`) metrics collector
-- [ ] Add Disk usage and I/O metrics collector
-- [ ] Add Network interfaces and bandwidth collector
-- [ ] Output formatting options (Plain Text, JSON, YAML)
-- [ ] Interactive TUI dashboard mode
+- [x] CPU telemetry collector (`/proc/cpuinfo`)
+- [x] Process state & thread inspector (`/proc/{pid}/status`)
+- [ ] Memory metrics collector (`/proc/meminfo`)
+- [ ] Disk usage and I/O statistics (`/proc/diskstats`)
+- [ ] Network interface bandwidth monitor (`/proc/net/dev`)
+- [ ] Structured export formats (`--json`, `--yaml`, tabular view)
+- [ ] Process management actions (graceful termination, niceness adjustment)
+
+---
+
+## Contributing
+
+Contributions and pull requests are welcome!
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/memory-collector`)
+3. Commit your changes (`git commit -m 'Add memory metrics collector'`)
+4. Push to the branch (`git push origin feature/memory-collector`)
+5. Open a Pull Request
 
 ---
 
